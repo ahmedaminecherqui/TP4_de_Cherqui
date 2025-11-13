@@ -13,6 +13,8 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiEmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
@@ -21,11 +23,14 @@ import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Scanner;
 
 public class RagNaif {
     public static void main(String[] args) {
 
-        // 1. Récupère la clé secrète depuis une variable d'environnement
+        // === Phase 1 : Enregistrement des embeddings ===
+
+        //Récupère la clé secrète depuis une variable d'environnement
         String apiKey = System.getenv("GEMINI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException(
@@ -33,7 +38,7 @@ public class RagNaif {
             );
         }
 
-        // 2. Crée le modèle de chat Gemini
+        //Crée le modèle de chat Gemini
         ChatModel chatModel = GoogleAiGeminiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName("gemini-2.5-flash")
@@ -41,13 +46,7 @@ public class RagNaif {
                 .timeout(Duration.ofSeconds(60))
                 .build();
 
-        // 3. Crée la mémoire (garde jusqu'à 10 messages)
-        ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
 
-        Assistant assistant = AiServices.builder(Assistant.class)
-                .chatMemory(chatMemory)
-                .chatModel(chatModel)
-                .build();
 
         // 1.Récupération du fichier PDF à utiliser comme source
         Path cheminFichier = Paths.get("src/main/resources/support_rag.pdf"); // exemple
@@ -76,6 +75,44 @@ public class RagNaif {
         EmbeddingStore<TextSegment> store = new InMemoryEmbeddingStore<>();
         store.addAll(embeddings, segments);
 
+        // === Phase 2 : Création du ContentRetriever ===
+
+        // 1.creation du content retriver
+        ContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+                .embeddingStore(store)
+                .embeddingModel(embeddingModel)
+                .maxResults(2)             // on ne garde que les 2 segments les plus pertinents
+                .minScore(0.5)       // uniquement si le score >= 0.5
+                .build();
+
+        // 2.Crée la mémoire (garde jusqu'à 10 messages)
+        ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
+
+        // 3.Création de l’assistant avec le ContentRetriever
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatMemory(chatMemory)
+                .chatModel(chatModel)
+                .contentRetriever(retriever)
+                .build();
+
+        // Ask a question that must be answered from infos.txt
+        try (Scanner scanner = new Scanner(System.in)) {
+            while (true) {
+                System.out.println("==================================================");
+                System.out.println("Posez votre question : ");
+                String question = scanner.nextLine();
+                if (question.isBlank()) {
+                    continue;
+                }
+                System.out.println("==================================================");
+                if ("fin".equalsIgnoreCase(question)) {
+                    break;
+                }
+                String reponse = assistant.chat(question);
+                System.out.println("Assistant : " + reponse);
+                System.out.println("==================================================");
+            }
+        }
 
     }
 }
