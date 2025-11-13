@@ -8,7 +8,7 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiEmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
@@ -39,7 +39,7 @@ public class RagNaif {
         }
 
         //Crée le modèle de chat Gemini
-        ChatModel chatModel = GoogleAiGeminiChatModel.builder()
+        ChatLanguageModel chatModel = GoogleAiGeminiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName("gemini-2.5-flash")
                 .temperature(0.7)
@@ -49,7 +49,7 @@ public class RagNaif {
 
 
         // 1.Récupération du fichier PDF à utiliser comme source
-        Path cheminFichier = Paths.get("src/main/resources/support_rag.pdf"); // exemple
+        Path cheminFichier = Paths.get("src/main/resources/langchain_langchain4j.pdf"); // exemple
 
         //2.Création du parser Apache Tika (aucun argument requis)
         ApacheTikaDocumentParser parser = new ApacheTikaDocumentParser();
@@ -91,7 +91,7 @@ public class RagNaif {
         // 3.Création de l’assistant avec le ContentRetriever
         Assistant assistant = AiServices.builder(Assistant.class)
                 .chatMemory(chatMemory)
-                .chatModel(chatModel)
+                .chatLanguageModel(chatModel)
                 .contentRetriever(retriever)
                 .build();
 
